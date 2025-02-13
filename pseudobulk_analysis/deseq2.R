@@ -52,20 +52,12 @@ write.csv(subset(resOrdered, padj < 0.1), paste(fname, "res1.csv", sep="/"))
 write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "res05-UP-LFC2.csv", sep="/"))
 write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res05-DOWN-LFC2.csv", sep="/"))
 res05OrderedT <- as.data.frame(res05Ordered)
+
 ## genes above 1000 counts
 dds2 <- DESeqDataSetFromMatrix(countData = t(cf), colData=m, design=~condition)
 dds2 <- DESeq(dds2)
 res2 <- results(dds2)
 resOrdered <- res2[order(res2$pvalue),]
-#print(head(res05OrderedT))
-
-summary(res2)
-#res05 <- results(dds, alpha=0.05)
-#res05Ordered <- res05[order(res05$pvalue),]
-#write.csv(res05Ordered[res05Ordered$padj < 0.05,], paste(fname, "res05-above1000.csv", sep="/"))
-#write.csv(resOrdered[resOrdered$padj < 0.1,], paste(fname, "res1-above1000.csv", sep="/"))
-#write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "res05-above1000-UP-LFC2.csv", sep="/"))
-#write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res05-above1000-DOWN-LFC2.csv", sep="/"))
 
 ## quality plots
 # Plot dispersion estimates
@@ -73,24 +65,12 @@ png(file=paste(fname, "dispersion-estimates.png", sep="/"))
 plotDispEsts(dds)
 dev.off()
 
-### lets plot in the first place the dispersions following different transformations
+### different transformations
 vsd <- vst(dds, blind=TRUE) ## recommended for large sample numbers
 #rld <- rlog(dds, blind=TRUE)
 
-# this gives log2(n + 1)
-#ntd <- normTransform(dds)
-#library("vsn")
-#png(file=paste(fname, "meanSdPlot-log-pseudocounts.png", sep="/"))
-#meanSdPlot(assay(ntd))
-#dev.off()
-#png(file=paste(fname, "meanSdPlot-vsd.png", sep="/"))
-#meanSdPlot(assay(vsd))
-#dev.off()
-#png(file=paste(fname, "meanSdPlot-rld.png", sep="/"))
-#meanSdPlot(assay(rld))
-#dev.off()
 ## plot PCA
-### I will use the vsd normalisation method
+###  vsd normalisation method
 pcaData <- plotPCA(vsd, intgroup=c("condition"), returnData=TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
 png(file=paste(fname, "PCA.png", sep="/"))
@@ -100,18 +80,20 @@ ggplot(pcaData, aes(PC1, PC2, color=condition)) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
   coord_fixed()
 dev.off()
+
+
 ## sample dist heatmap
 library("RColorBrewer")
-print(head(assay(vsd)))
+
 sampleDists <- dist(t(assay(vsd)))
 sampleDistMatrix <- as.matrix(sampleDists)
 rownames(sampleDistMatrix) <- vsd$condition
 colnames(sampleDistMatrix) <- NULL
-print(head(sampleDists))
+
 colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
-## FIX THIS PART
+
 ## select 10 samples from each group
-#png(file=paste(fname, "10samplesdist_heatmap.png", sep="/"))
+png(file=paste(fname, "10samplesdist_heatmap.png", sep="/"))
 
 pheatmap(sampleDistMatrix,
          clustering_distance_rows=sampleDists,
@@ -119,6 +101,7 @@ pheatmap(sampleDistMatrix,
          col=colors)
          #annotation = m[, c("condition"), drop=F])
 dev.off()
+
 ## count plots
 d <- plotCounts(dds, gene=which.min(res$padj), intgroup="condition", 
                 returnData=TRUE)
@@ -129,7 +112,6 @@ ggplot(d, aes(x=condition, y=count)) +
   scale_y_log10(breaks=c(25,100,400))
 dev.off()
 
-
 ## MA plots
 png(file=paste(fname, "rawMA.png", sep="/"))
 plotMA(res, ylim=c(-2,2))
@@ -138,6 +120,7 @@ png(file=paste(fname, "shrunkMA.png", sep="/"))
 resLFC <- lfcShrink(dds, coef=2, type="apeglm")
 plotMA(resLFC, ylim=c(-2,2))
 dev.off()
+
 ## make vulcano plot
 ## lfcShrink before?
 png(file=paste(fname, "volcano.png", sep="/"),
