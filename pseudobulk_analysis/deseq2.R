@@ -3,7 +3,7 @@
 args = commandArgs(trailingOnly=TRUE)
 
 # Checking if there are three arguments provided
-if (length(args)!=2) {
+if (length(args)!=4) {
   stop("At least two arguments must be supplied: the workdir path and the comparison folder name", call.=FALSE)
 }
 
@@ -17,24 +17,37 @@ suppressMessages(library(tibble))
 suppressMessages(library(pheatmap))
 
 fname <- paste(args[1], args[2], sep="/")
+control <- args[3]
+treatment <- args[4]
 
 m <- read.csv(paste(fname, "conditions.csv", sep="/"), sep="\t", row.names = 1)
 c <- read.csv(paste(fname, "counts.csv", sep="/"), sep="\t", row.names = 1)
 cf <- read.csv(paste(fname, "countsabove1000.csv", sep="/"), sep="\t", row.names = 1)
 
-# Checking if index in colData (m) and in counts.csv are the same
-if (all(row.names(c)!=row.names(m))) {
-  stop("ERROR: rownames are not equal between the count matrix and metadata", call.=FALSE)
+# Checking if index in colData (m) and in counts.csv are in the same order
+if (any(row.names(c)!=row.names(m))) {
+        print("Changing order of rows...")
+        c <- c[row.names(m),]
+        cf <- cf[row.names(m),]
 }
 
-## if converting to int all values as the ones from scafe counts 
 #newc <- data.frame(lapply(c, function(y) if(is.numeric(y)) round(y, 0) else y)) 
 ## all genes
 dds <- DESeqDataSetFromMatrix(countData = t(c), colData=m, 
                                 design=~condition)
+
+## before running DESeq2, we will add the order of categories given control-condition/case variable
+dds$condition <- factor(dds$condition, levels = c(control, treatment))
+
+## run statistical test and export results
 dds <- DESeq(dds)
 res <- results(dds)
 
+## filter low-expressed genes
+##keep <- rowSums(counts(dds)) >= 10
+##dds <- dds[keep,]
+
+## order by pvalue and export counts (norm and unnormalized)
 resOrdered <- res[order(res$pvalue),]
 normc <- counts(dds, normalized = TRUE)
 con <- counts(dds, normalized = FALSE)
@@ -43,9 +56,7 @@ write.csv(normc, paste(fname, "DGE_normcounts.csv", sep="/"))
 write.csv(con, paste(fname, "DGE_counts.csv", sep="/"))
 write.csv(resOrdered, paste(fname, "res.csv", sep="/"))
 
-summary(res)
 res05 <- results(dds, alpha=0.05)
-summary(res05)
 res05Ordered <- res05[order(res05$pvalue),]
 write.csv(subset(res05Ordered, padj < 0.05), paste(fname, "res05.csv", sep="/"))
 write.csv(subset(resOrdered, padj < 0.1), paste(fname, "res1.csv", sep="/"))
