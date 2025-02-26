@@ -50,7 +50,7 @@ options:
 Example script for simple contrasts: pseudobulk_analysis/deseq2.R
 
 ```
-Rscript /group/dominguez/aft/scripts/IEI_popgen/pseudobulk_analysis/deseq2.R input_folder output_folder
+Rscript /group/dominguez/aft/scripts/IEI_popgen/pseudobulk_analysis/deseq2.R input_folder output_folder control_var treatment_var
 ```
 
 
