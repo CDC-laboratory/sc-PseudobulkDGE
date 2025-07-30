@@ -125,7 +125,7 @@ def pseudobulk_prep(df, sample_field, anot_field, condition1, condition2,
 
     ## avoid spaces or other problematic characters on annotation fields
     df.obs['condition'] = np.where(df.obs[anot_field] == condition1, condition1.replace(' ', '-'), 
-                                   '')
+                                   df.obs['condition'])
     df.obs['condition'] = np.where(df.obs[anot_field] == condition2, condition2.replace(' ', '-'), 
                                    df.obs['condition'])
 
