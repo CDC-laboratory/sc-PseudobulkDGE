@@ -1,13 +1,33 @@
 #! /usr/bin/env Rscript
+library("optparse")
+ 
+option_list = list(
+  make_option(c("-g", "--group"), type="character", 
+              help="comparison group folder", metavar="character"),
+  make_option(c("-r", "--contrast"), type="character", default=NULL, 
+              help="contrast folder", metavar="character"),
+  make_option(c("-c", "--control"), type="character", 
+              help="control variable", metavar="character"),
+  make_option(c("-t", "--treatment"), type="character", 
+              help="treatment variable", metavar="character"),
+  make_option(c("-m", "--mincount"), type="character", default=10, 
+              help="min. count for gene filtering", metavar="integer"),
+  make_option(c("-v", "--covariate"), type="character", default=NULL, 
+              help="covariates (comma separated)", metavar="character")
 
-args = commandArgs(trailingOnly=TRUE)
+);
+ 
+opt_parser = OptionParser(option_list=option_list);
+opt = parse_args(opt_parser);
 
+print(opt)
+print(length(opt))
 # Checking if there are three arguments provided
-if (length(args)!=4) {
-  stop("At least two arguments must be supplied: the workdir path and the comparison folder name", call.=FALSE)
+if (length(opt)< 3) {
+  stop("At least three arguments must be supplied", call.=FALSE)
 }
 
-## load librarues
+## load libraries
 suppressMessages(library(DESeq2))
 suppressMessages(library(EnhancedVolcano))
 suppressMessages(library(ggplot2))
@@ -16,13 +36,37 @@ suppressMessages(library(tidyr))
 suppressMessages(library(tibble))
 suppressMessages(library(pheatmap))
 
-fname <- paste(args[1], args[2], sep="/")
-control <- args[3]
-treatment <- args[4]
+convert_numeric_to_integer <- function(df) {
+  # Save row and column names
+  rownames_df <- rownames(df)
+  colnames_df <- colnames(df)
+  
+  # Convert numeric columns to integers
+  df_int <- as.data.frame(lapply(df, function(col) {
+    if (is.numeric(col)) as.integer(round(col)) else col
+  }))
+  
+  # Restore row and column names
+  rownames(df_int) <- rownames_df
+  colnames(df_int) <- colnames_df
+  
+  return(df_int)
+}
+
+
+fname <- paste(opt$group, opt$contrast, sep="/")
+control <- opt$control
+treatment <- opt$treatment
+print(fname)
 
 m <- read.csv(paste(fname, "conditions.csv", sep="/"), sep="\t", row.names = 1)
 c <- read.csv(paste(fname, "counts.csv", sep="/"), sep="\t", row.names = 1)
 cf <- read.csv(paste(fname, "countsabove1000.csv", sep="/"), sep="\t", row.names = 1)
+print(row.names(c))
+
+## conver to int
+#c <- convert_numeric_to_integer(c)
+#cf <- convert_numeric_to_integer(cf)
 
 # Checking if index in colData (m) and in counts.csv are in the same order
 if (any(row.names(c)!=row.names(m))) {
@@ -30,27 +74,46 @@ if (any(row.names(c)!=row.names(m))) {
         c <- c[row.names(m),]
         cf <- cf[row.names(m),]
 }
-
-#newc <- data.frame(lapply(c, function(y) if(is.numeric(y)) round(y, 0) else y)) 
+print(row.names(m))
+print(row.names(c))
+print(dim(c))
 ## all genes
+
+val <- ""
+print(opt$covariate)
+
+if (!is.null(opt$covariate) && length(opt$covariate) > 0)  {
+        val <- paste0(opt$covariate.strreplace(",", "+"), '+')
+}
+print(paste0("~", val, "condition"))
 dds <- DESeqDataSetFromMatrix(countData = t(c), colData=m, 
-                                design=~condition)
+                                design=formula(paste0("~", val, "condition")))
 
 ## before running DESeq2, we will add the order of categories given control-condition/case variable
 dds$condition <- factor(dds$condition, levels = c(control, treatment))
+
+## filter low-expressed genes
+countsDDs <- counts(dds)
+initrow <- nrow(countsDDs)
+keep <- rowSums(countsDDs) >= opt$mincount
+print(length(keep))
+dds <- dds[keep,]
+
+print(paste("n. of genes filtered by min", opt$mincount, "counts:", 
+        initrow - nrow(counts(dds)), sep=" "))
+
+# Estimate size factors with poscounts to overcome log with zero values
+##Uses positive counts only to compute size factors.
+#dds <- estimateSizeFactors(dds, type = "poscounts")
 
 ## run statistical test and export results
 dds <- DESeq(dds)
 res <- results(dds)
 
-## filter low-expressed genes
-##keep <- rowSums(counts(dds)) >= 10
-##dds <- dds[keep,]
-
 ## order by pvalue and export counts (norm and unnormalized)
 resOrdered <- res[order(res$pvalue),]
 normc <- counts(dds, normalized = TRUE)
-con <- counts(dds, normalized = FALSE)
+con <- counts(dds, normalized = FALSE) ## the default is false
 
 write.csv(normc, paste(fname, "DGE_normcounts.csv", sep="/"))
 write.csv(con, paste(fname, "DGE_counts.csv", sep="/"))
@@ -64,12 +127,6 @@ write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "
 write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res05-DOWN-LFC2.csv", sep="/"))
 res05OrderedT <- as.data.frame(res05Ordered)
 
-## genes above 1000 counts
-dds2 <- DESeqDataSetFromMatrix(countData = t(cf), colData=m, design=~condition)
-dds2 <- DESeq(dds2)
-res2 <- results(dds2)
-resOrdered <- res2[order(res2$pvalue),]
-
 ## quality plots
 # Plot dispersion estimates
 png(file=paste(fname, "dispersion-estimates.png", sep="/"))
@@ -82,10 +139,25 @@ vsd <- vst(dds, blind=TRUE) ## recommended for large sample numbers
 
 ## plot PCA
 ###  vsd normalisation method
+#### condition
 pcaData <- plotPCA(vsd, intgroup=c("condition"), returnData=TRUE)
 percentVar <- round(100 * attr(pcaData, "percentVar"))
-png(file=paste(fname, "PCA.png", sep="/"))
+png(file=paste(fname, "PCA.png", sep="/"),
+                width = 1200, height = 900,
+                res=200)
 ggplot(pcaData, aes(PC1, PC2, color=condition)) +
+  geom_point(size=3) +
+  xlab(paste0("PC1: ",percentVar[1],"% variance")) +
+  ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
+  coord_fixed()
+dev.off()
+
+#### sample_ID (to add cool palette here)
+pcaData <- plotPCA(vsd, intgroup=c("sample"), returnData=TRUE)
+percentVar <- round(100 * attr(pcaData, "percentVar"))
+png(file=paste(fname, "PCA-replicates.png", sep="/"),
+                width = 1200, height = 900, res=200)
+ggplot(pcaData, aes(PC1, PC2, color=sample)) +
   geom_point(size=3) +
   xlab(paste0("PC1: ",percentVar[1],"% variance")) +
   ylab(paste0("PC2: ",percentVar[2],"% variance")) + 
