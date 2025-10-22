@@ -125,7 +125,7 @@ def pseudobulk_prep(df, sample_field, anot_field, condition1, condition2,
 
     ## avoid spaces or other problematic characters on annotation fields
     df.obs['condition'] = np.where(df.obs[anot_field] == condition1, condition1.replace(' ', '-'), 
-                                   df.obs['condition'])
+                                   '')
     df.obs['condition'] = np.where(df.obs[anot_field] == condition2, condition2.replace(' ', '-'), 
                                    df.obs['condition'])
 
@@ -373,7 +373,7 @@ def main():
         sys.exit('incorrect modality workflow')
     ## choose workflow
     ### quick workaround
-    lfields = adata.obs[column].unique().tolist()
+    lfields = sorted(adata.obs[column].unique().tolist())
     if modality == 'pairwise':
         l = [p for p in combinations(lfields, r=2)]
         for e in l:

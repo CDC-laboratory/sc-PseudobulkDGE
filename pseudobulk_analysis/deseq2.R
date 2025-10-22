@@ -16,7 +16,7 @@ option_list = list(
               help="covariates (comma separated)", metavar="character")
 
 );
- 
+
 opt_parser = OptionParser(option_list=option_list);
 opt = parse_args(opt_parser);
 
@@ -31,6 +31,7 @@ if (length(opt)< 3) {
 suppressMessages(library(DESeq2))
 suppressMessages(library(EnhancedVolcano))
 suppressMessages(library(ggplot2))
+suppressMessages(library(stringr))
 suppressMessages(library(dplyr))
 suppressMessages(library(tidyr))
 suppressMessages(library(tibble))
@@ -80,11 +81,11 @@ print(dim(c))
 ## all genes
 
 val <- ""
-print(opt$covariate)
 
 if (!is.null(opt$covariate) && length(opt$covariate) > 0)  {
-        val <- paste0(opt$covariate.strreplace(",", "+"), '+')
+        val <- paste0(str_replace(opt$covariate, ",", "+"), '+')
 }
+print(val)
 print(paste0("~", val, "condition"))
 dds <- DESeqDataSetFromMatrix(countData = t(c), colData=m, 
                                 design=formula(paste0("~", val, "condition")))
