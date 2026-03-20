@@ -118,14 +118,16 @@ con <- counts(dds, normalized = FALSE) ## the default is false
 
 write.csv(normc, paste(fname, "DGE_normcounts.csv", sep="/"))
 write.csv(con, paste(fname, "DGE_counts.csv", sep="/"))
-write.csv(resOrdered, paste(fname, "res.csv", sep="/"))
+write.csv(resOrdered, paste(fname, "res_alpha01.csv", sep="/"))
 
 res05 <- results(dds, alpha=0.05)
 res05Ordered <- res05[order(res05$pvalue),]
-write.csv(subset(res05Ordered, padj < 0.05), paste(fname, "res05.csv", sep="/"))
-write.csv(subset(resOrdered, padj < 0.1), paste(fname, "res1.csv", sep="/"))
-write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "res05-UP-LFC2.csv", sep="/"))
-write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res05-DOWN-LFC2.csv", sep="/"))
+write.csv(res05Ordered, paste(fname, "res_alpha05.csv", sep="/"))
+
+write.csv(subset(res05Ordered, padj < 0.05), paste(fname, "res_padj05.csv", sep="/"))
+write.csv(subset(resOrdered, padj < 0.1), paste(fname, "res_padj1.csv", sep="/"))
+write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "res_padj05-UP-LFC2.csv", sep="/"))
+write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res_padj05-DOWN-LFC2.csv", sep="/"))
 res05OrderedT <- as.data.frame(res05Ordered)
 
 ## quality plots
