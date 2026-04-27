@@ -10,6 +10,10 @@ option_list = list(
               help="control variable", metavar="character"),
   make_option(c("-t", "--treatment"), type="character", 
               help="treatment variable", metavar="character"),
+  make_option(c("-f", "--log2fc"), type="character", default=2,
+              help="log2FC threshold", metavar="character"),
+  make_option(c("-p", "--adjpval"), type="character", default=0.05,
+              help="adj. pval threshold", metavar="character"),
   make_option(c("-m", "--mincount"), type="character", default=10, 
               help="min. count for gene filtering", metavar="integer"),
   make_option(c("-v", "--covariate"), type="character", default=NULL, 
@@ -23,8 +27,8 @@ opt = parse_args(opt_parser);
 print(opt)
 print(length(opt))
 # Checking if there are three arguments provided
-if (length(opt)< 3) {
-  stop("At least three arguments must be supplied", call.=FALSE)
+if (length(opt)< 4) {
+  stop("At least four arguments must be supplied", call.=FALSE)
 }
 
 ## load libraries
@@ -118,17 +122,24 @@ con <- counts(dds, normalized = FALSE) ## the default is false
 
 write.csv(normc, paste(fname, "DGE_normcounts.csv", sep="/"))
 write.csv(con, paste(fname, "DGE_counts.csv", sep="/"))
-write.csv(resOrdered, paste(fname, "res_alpha01.csv", sep="/"))
 
-res05 <- results(dds, alpha=0.05)
-res05Ordered <- res05[order(res05$pvalue),]
-write.csv(res05Ordered, paste(fname, "res_alpha05.csv", sep="/"))
+adjp <- as.numeric(opt$adjpval)
 
-write.csv(subset(res05Ordered, padj < 0.05), paste(fname, "res_padj05.csv", sep="/"))
-write.csv(subset(resOrdered, padj < 0.1), paste(fname, "res_padj1.csv", sep="/"))
-write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange > 2), paste(fname, "res_padj05-UP-LFC2.csv", sep="/"))
-write.csv(subset(res05Ordered, padj < 0.05 & log2FoldChange < -2), paste(fname, "res_padj05-DOWN-LFC2.csv", sep="/"))
-res05OrderedT <- as.data.frame(res05Ordered)
+res <- results(dds, alpha= adjp)
+resOrdered <- res[order(res$pvalue),]
+adjp_name <- sub("\\.", "p", as.character(adjp))
+na1 <- paste0("res_alpha", adjp_name, ".csv")
+write.csv(resOrdered, paste(fname, na1, sep="/"))
+na2 <- paste0("res_padj", adjp_name, ".csv")
+write.csv(subset(resOrdered, padj < adjp), paste(fname, na2, sep="/"))
+
+logfct <- as.numeric(opt$log2fc)
+logfct_name <- sub("\\.", "p", as.character(opt$log2fc))
+name_up <- paste0("res_padj", adjp_name, "-UP-LFC", logfct_name,".csv")
+name_down <- paste0("res_padj", adjp_name, "-DOWN-LFC", logfct_name,".csv")
+write.csv(subset(resOrdered, padj < adjp & log2FoldChange > logfct), paste(fname, name_up, sep="/"))
+write.csv(subset(resOrdered, padj < adjp & log2FoldChange < -(logfct)), paste(fname, name_down, sep="/"))
+resOrderedT <- as.data.frame(resOrdered)
 
 ## quality plots
 # Plot dispersion estimates
@@ -231,7 +242,7 @@ dev.off()
 ## plot norm expression of 20 most significant genes
 ### res05Ordered and normc
 ## Order results by padj values
-top20_sig_genes <- res05OrderedT %>%
+top20_sig_genes <- resOrderedT %>%
         rownames_to_column(var="gene") %>%
         dplyr::pull(gene) %>%
         head(n=20)
