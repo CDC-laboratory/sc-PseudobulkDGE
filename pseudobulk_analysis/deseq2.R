@@ -14,8 +14,8 @@ option_list = list(
               help="log2FC threshold", metavar="character"),
   make_option(c("-p", "--adjpval"), type="character", default=0.05,
               help="adj. pval threshold", metavar="character"),
-  make_option(c("-m", "--mincount"), type="character", default=10, 
-              help="min. count for gene filtering", metavar="integer"),
+  make_option(c("-m", "--mincount"), type="integer", default=10, 
+              help="min. count for gene filtering", metavar="character"),
   make_option(c("-v", "--covariate"), type="character", default=NULL, 
               help="covariates (comma separated)", metavar="character")
 
@@ -100,13 +100,18 @@ dds$condition <- factor(dds$condition, levels = c(control, treatment))
 ## filter low-expressed genes
 countsDDs <- counts(dds)
 initrow <- nrow(countsDDs)
+print(class(opt$mincount))
 keep <- rowSums(countsDDs) >= opt$mincount
 print(length(keep))
 dds <- dds[keep,]
 
 print(paste("n. of genes filtered by min", opt$mincount, "counts:", 
         initrow - nrow(counts(dds)), sep=" "))
-
+## save genes passing count filter
+writeLines(
+  rownames(dds),
+  con = paste(fname, "genes_passing_DGE_count_filter.txt", sep="/")
+)
 # Estimate size factors with poscounts to overcome log with zero values
 ##Uses positive counts only to compute size factors.
 #dds <- estimateSizeFactors(dds, type = "poscounts")
